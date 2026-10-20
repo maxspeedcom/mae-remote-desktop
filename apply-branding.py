@@ -49,6 +49,13 @@ EDITS = [
      f'LegalCopyright = "{COPYRIGHT}"'),
     ('Cargo.toml', 'ProductName = "RustDesk"', f'ProductName = "{DISPLAY}"'),
     ('Cargo.toml', 'FileDescription = "RustDesk Remote Desktop"', f'FileDescription = "{DISPLAY}"'),
+    # ตัวแพ็ก portable (.exe ที่ผู้ใช้ดาวน์โหลด) มี Cargo.toml แยกของตัวเอง
+    ('libs/portable/Cargo.toml', 'description = "RustDesk Remote Desktop"', f'description = "{DISPLAY}"'),
+    ('libs/portable/Cargo.toml', 'LegalCopyright = "Copyright © 2026 Purslane Tech Pte. Ltd. All rights reserved."',
+     f'LegalCopyright = "{COPYRIGHT}"'),
+    ('libs/portable/Cargo.toml', 'ProductName = "RustDesk"', f'ProductName = "{DISPLAY}"'),
+    ('libs/portable/Cargo.toml', 'OriginalFilename = "rustdesk.exe"', f'OriginalFilename = "{APP_NAME}.exe"'),
+    ('libs/portable/Cargo.toml', 'FileDescription = "RustDesk Remote Desktop"', f'FileDescription = "{DISPLAY}"'),
     ('flutter/windows/runner/Runner.rc', 'VALUE "CompanyName", "Purslane Tech Pte. Ltd." "\\0"',
      f'VALUE "CompanyName", "{DISPLAY}" "\\0"'),
     ('flutter/windows/runner/Runner.rc', 'VALUE "FileDescription", "RustDesk Remote Desktop" "\\0"',
