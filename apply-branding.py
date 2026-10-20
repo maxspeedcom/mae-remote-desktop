@@ -113,6 +113,42 @@ def render_icon(size):
     return img.resize((size, size), Image.LANCZOS)
 
 
+def write_ico(path, big):
+    """ICO มาตรฐาน Windows: 16-128 เป็น BMP 32 บิต + AND mask, 256 เป็น PNG, planes=1
+    (Pillow เขียนทุกขนาดเป็น PNG และ planes=0 ทำให้ Explorer ไม่แสดงไอคอนของ .exe)"""
+    import io
+    import struct
+    images = []
+    for s in (16, 20, 24, 32, 40, 48, 64, 128, 256):
+        im = big.resize((s, s), Image.LANCZOS).convert('RGBA')
+        if s == 256:
+            buf = io.BytesIO()
+            im.save(buf, 'PNG')
+            images.append((s, buf.getvalue()))
+            continue
+        px = im.load()
+        xor = bytearray()
+        mask_row = ((s + 31) // 32) * 4
+        and_mask = bytearray()
+        for y in range(s - 1, -1, -1):
+            row_bits = bytearray(mask_row)
+            for x in range(s):
+                r, g, b, a = px[x, y]
+                xor += bytes((b, g, r, a))
+                if a == 0:
+                    row_bits[x // 8] |= 0x80 >> (x % 8)
+            and_mask += row_bits
+        header = struct.pack('<IiiHHIIiiII', 40, s, s * 2, 1, 32, 0, len(xor) + len(and_mask), 0, 0, 0, 0)
+        images.append((s, header + bytes(xor) + bytes(and_mask)))
+    out = struct.pack('<HHH', 0, 1, len(images))
+    offset = 6 + 16 * len(images)
+    for s, blob in images:
+        dim = 0 if s == 256 else s
+        out += struct.pack('<BBBBHHII', dim, dim, 0, 0, 1, 32, len(blob), offset)
+        offset += len(blob)
+    path.write_bytes(out + b''.join(blob for _, blob in images))
+
+
 def write_icons(root):
     big = render_icon(1024)
     for rel, size in [('res/icon.png', 512), ('res/32x32.png', 32), ('res/64x64.png', 64),
@@ -121,9 +157,8 @@ def write_icons(root):
                       ('flutter/assets/logo_light.png', 256), ('flutter/assets/logo_dark.png', 256)]:
         big.resize((size, size), Image.LANCZOS).save(root / rel)
         print(f'  png {rel} {size}px')
-    sizes = [(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)]
     for rel in ['res/icon.ico', 'res/tray-icon.ico', 'flutter/windows/runner/resources/app_icon.ico']:
-        big.save(root / rel, sizes=sizes)
+        write_ico(root / rel, big)
         print(f'  ico {rel}')
     for rel in ['res/logo.svg', 'res/scalable.svg', 'flutter/assets/icon.svg']:
         (root / rel).write_text(LOGO_SVG, encoding='utf-8')
