@@ -93,7 +93,7 @@ BEGIN
             VALUE "FileDescription", "MAE Remote Desktop" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "rustdesk" "\0"
-            VALUE "LegalCopyright", "Copyright © 2026 MAE Remote Desktop. Based on RustDesk (AGPL-3.0)." "\0"
+            VALUE "LegalCopyright", "Copyright © 2026 MAE Remote Desktop" "\0"
             VALUE "OriginalFilename", "rustdesk.exe" "\0"
             VALUE "ProductName", "MAE Remote Desktop" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"

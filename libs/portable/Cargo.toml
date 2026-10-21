@@ -26,7 +26,7 @@ windows = { version = "0.61", features = [
 native-windows-gui = {version = "1.0", default-features = false, features = ["animation-timer", "image-decoder"]}
 
 [package.metadata.winres]
-LegalCopyright = "Copyright © 2026 MAE Remote Desktop. Based on RustDesk (AGPL-3.0)."
+LegalCopyright = "Copyright © 2026 MAE Remote Desktop"
 ProductName = "MAE Remote Desktop"
 OriginalFilename = "MAERemote.exe"
 FileDescription = "MAE Remote Desktop"

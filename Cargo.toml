@@ -254,7 +254,7 @@ webrtc-util = { git = "https://github.com/rustdesk-org/webrtc", rev = "49c89bd8d
 webrtc-sctp = { git = "https://github.com/rustdesk-org/webrtc", rev = "49c89bd8d30e6e62e4c1a96cee38fdc11f79ef63" }
 
 [package.metadata.winres]
-LegalCopyright = "Copyright © 2026 MAE Remote Desktop. Based on RustDesk (AGPL-3.0)."
+LegalCopyright = "Copyright © 2026 MAE Remote Desktop"
 ProductName = "MAE Remote Desktop"
 FileDescription = "MAE Remote Desktop"
 OriginalFilename = "rustdesk.exe"

@@ -16,7 +16,7 @@ DISPLAY = 'MAE Remote Desktop'
 HOST = 'rd.maesuaisystem.com'
 PUB_KEY = 'jSmZ2nHQNrvAjH8dTHgA6yS1q4fOaLLLdjDMo8cobcQ='
 SITE = 'https://remote.maesuaisystem.com'
-COPYRIGHT = 'Copyright © 2026 MAE Remote Desktop. Based on RustDesk (AGPL-3.0).'
+COPYRIGHT = 'Copyright © 2026 MAE Remote Desktop'
 
 LOGO_SVG = (
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">'
@@ -43,7 +43,7 @@ EDITS = [
     # ไม่มีเซิร์ฟเวอร์บัญชีของ RustDesk: ชี้ไปพอร์ต API ของเราเอง (ยังไม่มีบริการ ล็อกอินจะล้มแบบปลอดภัย)
     ('src/common.rs',
      '    "https://admin.rustdesk.com".to_owned()\n}',
-     f'    "http://{HOST}:21114".to_owned()\n}}'),
+     f'    "{SITE}".to_owned()\n}}'),
     ('Cargo.toml', 'description = "RustDesk Remote Desktop"', f'description = "{DISPLAY}"'),
     ('Cargo.toml', 'LegalCopyright = "Copyright © 2026 Purslane Tech Pte. Ltd. All rights reserved."',
      f'LegalCopyright = "{COPYRIGHT}"'),
@@ -76,6 +76,16 @@ EDITS = [
     ('flutter/lib/common.dart', 'static const Color button = Color(0xFF2C8CFF);',
      'static const Color button = Color(0xFF4C3BFF);'),
     ('flutter/lib/desktop/pages/desktop_home_page.dart', 'https://rustdesk.com/download', f'{SITE}/#download'),
+    ('flutter/lib/desktop/widgets/tabbar_widget.dart', '"RustDesk",\n                              style: TextStyle(fontSize: 13),',
+     '"MAE Remote",\n                              style: TextStyle(fontSize: 13),'),
+    ('flutter/lib/desktop/pages/desktop_setting_page.dart', "launchUrlString('https://rustdesk.com');", f"launchUrlString('{SITE}');"),
+    ('flutter/lib/desktop/pages/desktop_setting_page.dart', 'decoration: const BoxDecoration(color: Color(0xFF2c8cff)),',
+     'decoration: const BoxDecoration(color: Color(0xFF4C3BFF)),'),
+    # AGPL: ต้องคงข้อความลิขสิทธิ์ของต้นฉบับไว้ในหน้า About (ไม่ใช้ชื่อแบรนด์ RustDesk)
+    ('flutter/lib/desktop/pages/desktop_setting_page.dart',
+     "'Copyright © ${DateTime.now().toString().substring(0, 4)} Purslane Tech Pte. Ltd.\\n$license',",
+     "'Copyright © ${DateTime.now().toString().substring(0, 4)} MAE Remote Desktop\\nPortions © Purslane Tech Pte. Ltd. · GNU AGPL-3.0 · github.com/maxspeedcom/mae-remote-desktop\\n$license',"),
+    ('flutter/lib/desktop/pages/desktop_setting_page.dart', "translate('Slogan_tip'),", "'remote.maesuaisystem.com',"),
     ('flutter/lib/mobile/pages/connection_page.dart', 'https://rustdesk.com/download', f'{SITE}/#download'),
 ]
 
