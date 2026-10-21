@@ -40,6 +40,10 @@ EDITS = [
     ('libs/hbb_common/src/config.rs',
      'pub const RS_PUB_KEY: &str = "OeVuKk5nlHiXp+APNn0Y3pC1Iwpwn44JGqrQCsWqmBw=";',
      f'pub const RS_PUB_KEY: &str = "{PUB_KEY}";'),
+    # คุณภาพภาพเริ่มต้น = Good image quality ("best") แทน Balanced; ผู้ใช้ยังเปลี่ยนเองได้
+    ('libs/hbb_common/src/config.rs',
+     'self.get_string(key, "balanced", vec!["best", "low", "custom"])',
+     'self.get_string(key, "best", vec!["balanced", "low", "custom"])'),
     # ไม่มีเซิร์ฟเวอร์บัญชีของ RustDesk: ชี้ไปพอร์ต API ของเราเอง (ยังไม่มีบริการ ล็อกอินจะล้มแบบปลอดภัย)
     ('src/common.rs',
      '    "https://admin.rustdesk.com".to_owned()\n}',

@@ -17,3 +17,4 @@ distributed under the same license (GNU AGPL-3.0, see `LICENCE`).
 - Upstream push/schedule workflows removed; only `mae-windows.yml` and the reusable `flutter-build.yml`, `bridge.yml` and `third-party-RustDeskTempTopMostWindow.yml` remain.
 
 All changes are applied by `apply-branding.py`; source for every released build is published in this repository.
+- Default image quality is "Good image quality" (`best`) instead of Balanced; users can still change it per session or in Settings → Display.
