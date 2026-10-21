@@ -86,6 +86,9 @@ EDITS = [
      "'Copyright © ${DateTime.now().toString().substring(0, 4)} Purslane Tech Pte. Ltd.\\n$license',",
      "'Copyright © ${DateTime.now().toString().substring(0, 4)} MAE Remote Desktop\\nPortions © Purslane Tech Pte. Ltd. · GNU AGPL-3.0 · github.com/maxspeedcom/mae-remote-desktop\\n$license',"),
     ('flutter/lib/desktop/pages/desktop_setting_page.dart', "translate('Slogan_tip'),", "'remote.maesuaisystem.com',"),
+    # "Powered by RustDesk" label under the logo (links to rustdesk.com): always hidden
+    ('flutter/lib/common.dart', 'if (bind.mainGetBuildinOption(key: "hide-powered-by-me") == \'Y\') {',
+     'if (true || bind.mainGetBuildinOption(key: "hide-powered-by-me") == \'Y\') {'),
     ('flutter/lib/mobile/pages/connection_page.dart', 'https://rustdesk.com/download', f'{SITE}/#download'),
 ]
 
