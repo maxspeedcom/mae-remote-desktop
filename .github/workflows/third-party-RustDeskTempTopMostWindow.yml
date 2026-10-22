@@ -1,4 +1,4 @@
-name: build RustDeskTempTopMostWindow
+name: Build window helper (reusable)
 
 on:
   workflow_call:
