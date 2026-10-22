@@ -13,6 +13,7 @@ BRAND = (0x4C, 0x3B, 0xFF)
 WHITE = (255, 255, 255)
 APP_NAME = 'MAERemote'          # ห้ามมีช่องว่าง: ใช้เป็นชื่อ Windows service (`sc create {app_name}` ไม่ใส่ quote)
 DISPLAY = 'MAE Remote Desktop'
+SHORT = 'MAE Remote'  # ชื่อสั้นที่แสดงบนหน้าต่าง/แถบงาน
 HOST = 'rd.maesuaisystem.com'
 PUB_KEY = 'jSmZ2nHQNrvAjH8dTHgA6yS1q4fOaLLLdjDMo8cobcQ='
 SITE = 'https://remote.maesuaisystem.com'
@@ -82,6 +83,29 @@ EDITS = [
     ('flutter/lib/desktop/pages/desktop_home_page.dart', 'https://rustdesk.com/download', f'{SITE}/#download'),
     ('flutter/lib/desktop/widgets/tabbar_widget.dart', '"RustDesk",\n                              style: TextStyle(fontSize: 13),',
      '"MAE Remote Desktop",\n                              style: TextStyle(fontSize: 13),'),
+    # ชื่อที่ผู้ใช้เห็น (แถบงาน, ชื่อหน้าต่าง, ข้อความในโปรแกรม, tooltip ถาด) = "MAE Remote" มีเว้นวรรค
+    # APP_NAME ยังเป็น MAERemote (ใช้เป็นชื่อ service/โฟลเดอร์) ; การค้นหาหน้าต่างใช้ชื่อเดียวกับชื่อหน้าต่างเสมอ
+    ('src/flutter.rs',
+     '    let name = crate::platform::wide_string(&crate::get_app_name());\n    if length > name.len() as i32 {',
+     f'    let name = crate::platform::wide_string("{SHORT}");\n    if length > name.len() as i32 {{'),
+    ('src/core_main.rs',
+     '            &crate::platform::FLUTTER_RUNNER_WIN32_WINDOW_CLASS,\n            &crate::get_app_name(),',
+     f'            &crate::platform::FLUTTER_RUNNER_WIN32_WINDOW_CLASS,\n            "{SHORT}",'),
+    ('flutter/lib/common.dart',
+     'String getWindowName({WindowType? overrideType}) {\n  final name = bind.mainGetAppNameSync();',
+     f"String getWindowName({{WindowType? overrideType}}) {{\n  const name = '{SHORT}';"),
+    ('flutter/lib/main.dart',
+     "              : bind.mainGetAppNameSync(),\n          theme: MyTheme.lightTheme,",
+     f"              : '{SHORT}',\n          theme: MyTheme.lightTheme,"),
+    ('src/lang.rs',
+     '                let app_name = crate::get_app_name();\n                if !app_name.contains("RustDesk") {',
+     f'                let app_name = "{SHORT}".to_owned();\n                if !app_name.contains("RustDesk") {{'),
+    ('src/tray.rs',
+     '                "{} {}",\n                crate::get_app_name(),\n                translate("Service is running".to_owned()),',
+     f'                "{{}} {{}}",\n                "{SHORT}",\n                translate("Service is running".to_owned()),'),
+    ('src/tray.rs',
+     '                "{} - {}\\n{}",\n                crate::get_app_name(),\n                translate("Ready".to_owned()),',
+     f'                "{{}} - {{}}\\n{{}}",\n                "{SHORT}",\n                translate("Ready".to_owned()),'),
     # หน้าต่างหลักแสดงชื่อโปรแกรมข้างโลโก้บนแถบหัว (ค่าเดิม showTitle = false แสดงแค่ไอคอน)
     ('flutter/lib/desktop/pages/desktop_tab_page.dart',
      '            body: DesktopTab(\n              controller: tabController,\n',

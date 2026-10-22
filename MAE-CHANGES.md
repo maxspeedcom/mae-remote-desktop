@@ -18,4 +18,4 @@ distributed under the same license (GNU AGPL-3.0, see `LICENCE`).
 
 All changes are applied by `apply-branding.py`; source for every released build is published in this repository.
 - Default image quality is "Good image quality" (`best`) instead of Balanced; users can still change it per session or in Settings → Display.
-- The main window title bar shows "MAE Remote Desktop" next to the logo (upstream shows the logo only). The OS window title stays the app name (`MAERemote`) because single-instance detection looks the window up by that title.
+- The main window title bar shows "MAE Remote Desktop" next to the logo (upstream shows the logo only). Window titles, the taskbar, the tray tooltip and UI text show "MAE Remote" (with a space); the runner and `core_main.rs` look the main window up by that same title, so single-instance detection still works. `APP_NAME` stays `MAERemote` (service, install folder, exe name).
