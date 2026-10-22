@@ -428,6 +428,15 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   }
 
   Widget buildHelpCards(String updateUrl) {
+    if (bind.isCustomClient() && updateUrl.isNotEmpty && !isCardClosed) {
+      final ver = Uri.tryParse(updateUrl)?.queryParameters['update'] ?? '';
+      return buildInstallCard(
+          "Status",
+          "${translate("new-version-of-{MAE Remote}-tip")} ($ver).",
+          "Download", () async {
+        await launchUrl(Uri.parse(updateUrl));
+      }, closeButton: true);
+    }
     if (!bind.isCustomClient() &&
         updateUrl.isNotEmpty &&
         !isCardClosed &&

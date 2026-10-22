@@ -83,6 +83,85 @@ EDITS = [
     ('flutter/lib/desktop/pages/desktop_home_page.dart', 'https://rustdesk.com/download', f'{SITE}/#download'),
     ('flutter/lib/desktop/widgets/tabbar_widget.dart', '"RustDesk",\n                              style: TextStyle(fontSize: 13),',
      '"MAE Remote Desktop",\n                              style: TextStyle(fontSize: 13),'),
+    # ระบบแจ้งอัปเดตของ MAE: โปรแกรมอ่าน https://remote.maesuaisystem.com/version.json ตอนเปิด
+    # ถ้า build ในไฟล์ > MAE_BUILD จะขึ้นการ์ด "มี MAE Remote เวอร์ชันใหม่" + ปุ่มดาวน์โหลด (เปิดหน้าเว็บ)
+    # เพิ่ม MAE_BUILD ทุกครั้งที่ปล่อยรุ่นใหม่ แล้วแก้ site/version.json ให้ตรง
+    ('src/common.rs',
+     '''pub fn check_software_update() {
+    if is_custom_client() {
+        return;
+    }''',
+     '''pub fn check_software_update() {
+    if is_custom_client() {
+        mae_check_update();
+        return;
+    }'''),
+    ('src/common.rs',
+     '''// No need to check `danger_accept_invalid_cert` for now.
+// Because the url is always `https://api.rustdesk.com/version/latest`.''',
+     '''// MAE Remote update notice. Bump MAE_BUILD for every release and keep
+// https://remote.maesuaisystem.com/version.json ({"build": N, "version": "1.5.0-N"}) in step.
+pub const MAE_BUILD: u64 = 7;
+const MAE_VERSION_URL: &str = "https://remote.maesuaisystem.com/version.json";
+
+fn mae_check_update() {
+    std::thread::spawn(move || allow_err!(mae_do_check_update()));
+}
+
+#[tokio::main(flavor = "current_thread")]
+async fn mae_do_check_update() -> hbb_common::ResultType<()> {
+    let client = crate::hbbs_http::create_http_client_async_with_url_strict(MAE_VERSION_URL).await?;
+    let bytes = client.get(MAE_VERSION_URL).send().await?.bytes().await?;
+    let latest: Value = serde_json::from_slice(&bytes)?;
+    let build = latest["build"].as_u64().unwrap_or(0);
+    let version = latest["version"].as_str().unwrap_or_default();
+    if build > MAE_BUILD && !version.is_empty() {
+        #[cfg(feature = "flutter")]
+        {
+            let url = format!("https://remote.maesuaisystem.com/?update={version}");
+            let mut m = HashMap::new();
+            m.insert("name", "check_software_update_finish");
+            m.insert("url", url.as_str());
+            if let Ok(data) = serde_json::to_string(&m) {
+                let _ = crate::flutter::push_global_event(crate::flutter::APP_TYPE_MAIN, data);
+            }
+        }
+    }
+    Ok(())
+}
+
+// No need to check `danger_accept_invalid_cert` for now.
+// Because the url is always `https://api.rustdesk.com/version/latest`.'''),
+    # ตัวอัปเดตอัตโนมัติของต้นทางจะไปโหลดตัวติดตั้งจาก GitHub ของต้นทาง: ปิดถาวรสำหรับ MAE
+    ('src/updater.rs',
+     '''fn check_update(manually: bool) -> ResultType<()> {
+''',
+     '''fn check_update(manually: bool) -> ResultType<()> {
+    if crate::is_custom_client() {
+        return Ok(());
+    }
+'''),
+    ('flutter/lib/common.dart',
+     '''    if (!bind.isCustomClient()) {
+      platformFFI.registerEventHandler(
+          kCheckSoftwareUpdateFinish, kCheckSoftwareUpdateFinish,''',
+     '''    if (true) {
+      platformFFI.registerEventHandler(
+          kCheckSoftwareUpdateFinish, kCheckSoftwareUpdateFinish,'''),
+    ('flutter/lib/desktop/pages/desktop_home_page.dart',
+     '''  Widget buildHelpCards(String updateUrl) {
+    if (!bind.isCustomClient() &&''',
+     '''  Widget buildHelpCards(String updateUrl) {
+    if (bind.isCustomClient() && updateUrl.isNotEmpty && !isCardClosed) {
+      final ver = Uri.tryParse(updateUrl)?.queryParameters['update'] ?? '';
+      return buildInstallCard(
+          "Status",
+          "${translate("new-version-of-{MAE Remote}-tip")} ($ver).",
+          "Download", () async {
+        await launchUrl(Uri.parse(updateUrl));
+      }, closeButton: true);
+    }
+    if (!bind.isCustomClient() &&'''),
     # ข้อมูลไฟล์ (Properties → Details) ของ exe หลักและ DLL ไม่ให้ขึ้นชื่อเดิม
     ('flutter/windows/runner/Runner.rc', 'VALUE "InternalName", "rustdesk" "\\0"', f'VALUE "InternalName", "{APP_NAME}" "\\0"'),
     ('flutter/windows/runner/Runner.rc', 'VALUE "OriginalFilename", "rustdesk.exe" "\\0"', f'VALUE "OriginalFilename", "{APP_NAME}.exe" "\\0"'),

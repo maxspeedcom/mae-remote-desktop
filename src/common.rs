@@ -1019,12 +1019,44 @@ pub fn is_modifier(evt: &KeyEvent) -> bool {
 
 pub fn check_software_update() {
     if is_custom_client() {
+        mae_check_update();
         return;
     }
     let opt = LocalConfig::get_option(keys::OPTION_ENABLE_CHECK_UPDATE);
     if config::option2bool(keys::OPTION_ENABLE_CHECK_UPDATE, &opt) {
         std::thread::spawn(move || allow_err!(do_check_software_update()));
     }
+}
+
+// MAE Remote update notice. Bump MAE_BUILD for every release and keep
+// https://remote.maesuaisystem.com/version.json ({"build": N, "version": "1.5.0-N"}) in step.
+pub const MAE_BUILD: u64 = 7;
+const MAE_VERSION_URL: &str = "https://remote.maesuaisystem.com/version.json";
+
+fn mae_check_update() {
+    std::thread::spawn(move || allow_err!(mae_do_check_update()));
+}
+
+#[tokio::main(flavor = "current_thread")]
+async fn mae_do_check_update() -> hbb_common::ResultType<()> {
+    let client = crate::hbbs_http::create_http_client_async_with_url_strict(MAE_VERSION_URL).await?;
+    let bytes = client.get(MAE_VERSION_URL).send().await?.bytes().await?;
+    let latest: Value = serde_json::from_slice(&bytes)?;
+    let build = latest["build"].as_u64().unwrap_or(0);
+    let version = latest["version"].as_str().unwrap_or_default();
+    if build > MAE_BUILD && !version.is_empty() {
+        #[cfg(feature = "flutter")]
+        {
+            let url = format!("https://remote.maesuaisystem.com/?update={version}");
+            let mut m = HashMap::new();
+            m.insert("name", "check_software_update_finish");
+            m.insert("url", url.as_str());
+            if let Ok(data) = serde_json::to_string(&m) {
+                let _ = crate::flutter::push_global_event(crate::flutter::APP_TYPE_MAIN, data);
+            }
+        }
+    }
+    Ok(())
 }
 
 // No need to check `danger_accept_invalid_cert` for now.
