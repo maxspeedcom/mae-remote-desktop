@@ -83,6 +83,10 @@ EDITS = [
     ('flutter/lib/desktop/pages/desktop_home_page.dart', 'https://rustdesk.com/download', f'{SITE}/#download'),
     ('flutter/lib/desktop/widgets/tabbar_widget.dart', '"RustDesk",\n                              style: TextStyle(fontSize: 13),',
      '"MAE Remote Desktop",\n                              style: TextStyle(fontSize: 13),'),
+    # ข้อมูลไฟล์ (Properties → Details) ของ exe หลักและ DLL ไม่ให้ขึ้นชื่อเดิม
+    ('flutter/windows/runner/Runner.rc', 'VALUE "InternalName", "rustdesk" "\\0"', f'VALUE "InternalName", "{APP_NAME}" "\\0"'),
+    ('flutter/windows/runner/Runner.rc', 'VALUE "OriginalFilename", "rustdesk.exe" "\\0"', f'VALUE "OriginalFilename", "{APP_NAME}.exe" "\\0"'),
+    ('Cargo.toml', 'OriginalFilename = "rustdesk.exe"', f'OriginalFilename = "{APP_NAME}.exe"'),
     # ชื่อที่ผู้ใช้เห็น (แถบงาน, ชื่อหน้าต่าง, ข้อความในโปรแกรม, tooltip ถาด) = "MAE Remote" มีเว้นวรรค
     # APP_NAME ยังเป็น MAERemote (ใช้เป็นชื่อ service/โฟลเดอร์) ; การค้นหาหน้าต่างใช้ชื่อเดียวกับชื่อหน้าต่างเสมอ
     ('src/flutter.rs',
