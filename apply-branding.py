@@ -81,7 +81,11 @@ EDITS = [
      'static const Color button = Color(0xFF4C3BFF);'),
     ('flutter/lib/desktop/pages/desktop_home_page.dart', 'https://rustdesk.com/download', f'{SITE}/#download'),
     ('flutter/lib/desktop/widgets/tabbar_widget.dart', '"RustDesk",\n                              style: TextStyle(fontSize: 13),',
-     '"MAE Remote",\n                              style: TextStyle(fontSize: 13),'),
+     '"MAE Remote Desktop",\n                              style: TextStyle(fontSize: 13),'),
+    # หน้าต่างหลักแสดงชื่อโปรแกรมข้างโลโก้บนแถบหัว (ค่าเดิม showTitle = false แสดงแค่ไอคอน)
+    ('flutter/lib/desktop/pages/desktop_tab_page.dart',
+     '            body: DesktopTab(\n              controller: tabController,\n',
+     '            body: DesktopTab(\n              controller: tabController,\n              showTitle: true,\n'),
     ('flutter/lib/desktop/pages/desktop_setting_page.dart', "launchUrlString('https://rustdesk.com');", f"launchUrlString('{SITE}');"),
     ('flutter/lib/desktop/pages/desktop_setting_page.dart', 'decoration: const BoxDecoration(color: Color(0xFF2c8cff)),',
      'decoration: const BoxDecoration(color: Color(0xFF4C3BFF)),'),
