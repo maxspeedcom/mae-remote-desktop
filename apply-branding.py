@@ -101,7 +101,7 @@ EDITS = [
 // Because the url is always `https://api.rustdesk.com/version/latest`.''',
      '''// MAE Remote update notice. Bump MAE_BUILD for every release and keep
 // https://remote.maesuaisystem.com/version.json ({"build": N, "version": "1.5.0-N"}) in step.
-pub const MAE_BUILD: u64 = 7;
+pub const MAE_BUILD: u64 = 10;
 const MAE_VERSION_URL: &str = "https://remote.maesuaisystem.com/version.json";
 
 fn mae_check_update() {
@@ -207,8 +207,341 @@ async fn mae_do_check_update() -> hbb_common::ResultType<()> {
     ('flutter/lib/mobile/pages/connection_page.dart', 'https://rustdesk.com/download', f'{SITE}/#download'),
 ]
 
+# รายงานทราฟฟิกของแต่ละ session (r8): เครื่องที่ถูกรีโมทนับ byte ที่ส่ง/รับของการเชื่อมต่อนั้น แล้วส่งยอดสะสม
+# ไป {api}/api/audit/conn (action "traffic") ทุก 5 วินาที + ยอดสุดท้ายใน record "close"
+# -> API เก็บต่อ session + ยอดรวม -> MAE Monitor วาดกราฟเรียลไทม์/ย้อนหลังได้ แม้ session ต่อตรง (direct)
+TRAFFIC_EDITS = [
+    ('src/server/connection.rs',
+     """pub struct Connection {
+    inner: ConnInner,
+    display_idx: usize,
+    stream: super::Stream,
+    server: super::ServerPtrWeak,
+""",
+     """/// MAE: the peer stream with byte counters for the traffic report (see `post_traffic`). The methods
+/// below shadow the `Stream` methods of the same name; everything else reaches the stream via Deref.
+struct CountedStream {
+    inner: super::Stream,
+    tx: u64,
+    rx: u64,
+}
+
+impl std::ops::Deref for CountedStream {
+    type Target = super::Stream;
+    fn deref(&self) -> &super::Stream {
+        &self.inner
+    }
+}
+
+impl std::ops::DerefMut for CountedStream {
+    fn deref_mut(&mut self) -> &mut super::Stream {
+        &mut self.inner
+    }
+}
+
+impl CountedStream {
+    #[inline]
+    async fn send(&mut self, msg: &impl hbb_common::protobuf::Message) -> ResultType<()> {
+        self.tx += hbb_common::protobuf::Message::compute_size(msg) as u64;
+        self.inner.send(msg).await
+    }
+
+    #[inline]
+    async fn send_raw(&mut self, bytes: Vec<u8>) -> ResultType<()> {
+        self.tx += bytes.len() as u64;
+        self.inner.send_raw(bytes).await
+    }
+
+    #[inline]
+    async fn send_bytes(&mut self, bytes: hbb_common::bytes::Bytes) -> ResultType<()> {
+        self.tx += bytes.len() as u64;
+        self.inner.send_bytes(bytes).await
+    }
+
+    #[inline]
+    async fn next(&mut self) -> Option<Result<hbb_common::bytes::BytesMut, std::io::Error>> {
+        let res = self.inner.next().await;
+        if let Some(Ok(bytes)) = &res {
+            self.rx += bytes.len() as u64;
+        }
+        res
+    }
+}
+
+pub struct Connection {
+    inner: ConnInner,
+    display_idx: usize,
+    stream: CountedStream,
+    server: super::ServerPtrWeak,
+    // MAE: totals in the last traffic report, when it was sent, and whether it is still on its way
+    traffic_reported: (u64, u64),
+    traffic_last: Instant,
+    traffic_busy: Arc<AtomicBool>,
+"""),
+    ('src/server/connection.rs',
+     """            display_idx: 0,
+            stream,
+            server,
+""",
+     """            display_idx: 0,
+            stream: CountedStream { inner: stream, tx: 0, rx: 0 },
+            server,
+            traffic_reported: (0, 0),
+            traffic_last: Instant::now(),
+            traffic_busy: Arc::new(AtomicBool::new(false)),
+"""),
+    ('src/server/connection.rs',
+     "match fs::handle_read_jobs(&mut conn.read_jobs, &mut conn.stream).await {",
+     "match fs::handle_read_jobs_counted(&mut conn.read_jobs, &mut conn.stream.inner, &mut conn.stream.tx).await {"),
+    ('src/server/connection.rs',
+     """                    conn.file_remove_log_control.on_timer().drain(..).map(|x| conn.send_to_cm(x)).count();
+""",
+     """                    conn.file_remove_log_control.on_timer().drain(..).map(|x| conn.send_to_cm(x)).count();
+                    conn.post_traffic();
+"""),
+    ('src/server/connection.rs',
+     """        conn.post_conn_audit(json!({
+            "action": "close",
+        }));""",
+     """        conn.post_conn_audit(json!({
+            "action": "close",
+            "tx": conn.stream.tx,
+            "rx": conn.stream.rx,
+        }));"""),
+    ('src/server/connection.rs',
+     """            self.stream.set_raw();
+            let mut hbbs_rx = crate::hbbs_http::sync::signal_receiver();
+""",
+     """            self.stream.set_raw();
+            let mut hbbs_rx = crate::hbbs_http::sync::signal_receiver();
+            let mut traffic_timer = crate::rustdesk_interval(time::interval(Duration::from_secs(1)));
+"""),
+    ('src/server/connection.rs',
+     """                    _ = self.timer.tick() => {
+                        if last_recv_time.elapsed() >= H1 {""",
+     """                    _ = traffic_timer.tick() => self.post_traffic(),
+                    _ = self.timer.tick() => {
+                        if last_recv_time.elapsed() >= H1 {"""),
+    ('src/server/connection.rs',
+     """    fn get_files_for_audit(job_type: fs::JobType, mut files: Vec<FileEntry>) -> Vec<(String, i64)> {""",
+     """    /// MAE: this connection's running byte totals, at most every 5 s and only when they changed, so the
+    /// monitor shows live traffic for direct sessions too. One attempt and no queue: the next report
+    /// carries the totals anyway, and the "close" record (posted with retries) carries the final ones.
+    fn post_traffic(&mut self) {
+        let now = (self.stream.tx, self.stream.rx);
+        if !self.authorized
+            || self.server_audit_conn.is_empty()
+            || now == self.traffic_reported
+            || self.traffic_last.elapsed() < Duration::from_secs(5)
+            || self.traffic_busy.swap(true, Ordering::AcqRel)
+        {
+            return;
+        }
+        self.traffic_reported = now;
+        self.traffic_last = Instant::now();
+        let url = self.server_audit_conn.clone();
+        let body = json!({
+            "action": "traffic",
+            "id": Config::get_id(),
+            "uuid": crate::encode64(hbb_common::get_uuid()),
+            "conn_id": self.inner.id,
+            "session_id": self.lr.session_id,
+            "tx": now.0,
+            "rx": now.1,
+        })
+        .to_string();
+        let busy = self.traffic_busy.clone();
+        tokio::spawn(async move {
+            allow_err!(crate::post_request(url, body, "").await);
+            busy.store(false, Ordering::Release);
+        });
+    }
+
+    fn get_files_for_audit(job_type: fs::JobType, mut files: Vec<FileEntry>) -> Vec<(String, i64)> {"""),
+    ('libs/base/src/fs.rs',
+     """pub async fn handle_read_jobs(
+    jobs: &mut Vec<TransferJob>,
+    stream: &mut hbb_common::Stream,
+) -> ResultType<String> {
+    init_jobs(jobs, stream).await?;
+""",
+     """pub async fn handle_read_jobs(
+    jobs: &mut Vec<TransferJob>,
+    stream: &mut hbb_common::Stream,
+) -> ResultType<String> {
+    let mut sent = 0;
+    handle_read_jobs_counted(jobs, stream, &mut sent).await
+}
+
+/// MAE: `handle_read_jobs` that also adds the file bytes it sends to `sent` (the traffic report).
+pub async fn handle_read_jobs_counted(
+    jobs: &mut Vec<TransferJob>,
+    stream: &mut hbb_common::Stream,
+    sent: &mut u64,
+) -> ResultType<String> {
+    init_jobs(jobs, stream).await?;
+"""),
+    ('libs/base/src/fs.rs',
+     """            Ok(Some(block)) => {
+                stream.send(&new_block(block)).await?;
+""",
+     """            Ok(Some(block)) => {
+                *sent += block.data.len() as u64;
+                stream.send(&new_block(block)).await?;
+"""),
+]
+
+# หน้าจอรีโมทพอดีหน้าต่าง (r8, เห็นหน้าจอเต็มโดยไม่ต้องเลื่อนสกอลบาร์): ค่าเริ่มต้น view style
+# = adaptive แทน original (1:1 + scroll bar) และย้ายเครื่องที่บันทึกไว้ด้วยค่าเริ่มต้นเดิมครั้งเดียวตอนเปิดโปรแกรม
+FIT_EDITS = [
+    ('libs/hbb_common/src/config.rs',
+     'keys::OPTION_VIEW_STYLE => self.get_string(key, "original", vec!["adaptive"]),',
+     'keys::OPTION_VIEW_STYLE => self.get_string(key, "adaptive", vec!["original"]),'),
+    ('src/common.rs',
+     """fn mae_check_update() {
+    std::thread::spawn(move || allow_err!(mae_do_check_update()));
+}
+""",
+     """fn mae_check_update() {
+    std::thread::spawn(move || allow_err!(mae_do_check_update()));
+    std::thread::spawn(mae_fit_saved_peers);
+}
+
+/// MAE build 8: the remote screen fits the window by default ("adaptive", no scroll bars). Computers saved by
+/// older builds kept "original" (1:1 with scroll bars) only because it was the old default, so move them once.
+/// A choice made after this (toolbar -> Display) is kept.
+fn mae_fit_saved_peers() {
+    const DONE: &str = "mae-view-fit-migrated";
+    if LocalConfig::get_option(DONE) == "Y" {
+        return;
+    }
+    for (id, _, mut cfg) in config::PeerConfig::peers(None) {
+        if cfg.view_style == "original" {
+            cfg.view_style = "adaptive".to_owned();
+            cfg.store(&id);
+        }
+    }
+    LocalConfig::set_option(DONE.to_owned(), "Y".to_owned());
+}
+"""),
+]
+
+# r9: ติดตั้งแล้วเปลี่ยนชื่อตัวโปรแกรมเป็น <APP_NAME>.exe แบบเดียวกับ update_me (กันพลาดถ้าชุดติดตั้งยังชื่อ rustdesk.exe)
+INSTALL_EDITS = [
+    ('src/platform/windows.rs',
+     'md \\"{path}\\"\n{copy_exe}\nreg add {subkey} /f\nreg add {subkey} /f /v DisplayIcon',
+     'md \\"{path}\\"\n{copy_exe}\n{rename_exe}\nreg add {subkey} /f\nreg add {subkey} /f /v DisplayIcon'),
+    ('src/platform/windows.rs',
+     '        copy_exe = copy_exe_cmd(&src_exe, &exe, &path)?,\n        import_config = get_import_config(&exe),',
+     '        copy_exe = copy_exe_cmd(&src_exe, &exe, &path)?,\n        rename_exe = rename_exe_cmd(&src_exe, &path)?,\n        import_config = get_import_config(&exe),'),
+]
+
+# r9: ชื่อไฟล์ในโฟลเดอร์ติดตั้ง/Task Manager และข้อความที่ผู้ใช้เห็นเป็นชื่อ MAE Remote — core DLL = maeremote_core.dll,
+# broker = RuntimeBroker_maeremote.exe, ไม่มีไดรเวอร์เครื่องพิมพ์ (ชื่อ "RustDesk v4 Printer Driver" อยู่ในไดรเวอร์ที่เซ็นแล้ว แก้ไม่ได้)
+# จึงซ่อนตัวเลือกติดตั้งเครื่องพิมพ์, แท็บ Printer และ "Enable remote printer"; gen-workflow.py ไม่ใส่ไดรเวอร์ในชุดติดตั้ง
+NAME_EDITS = [
+    ('flutter/windows/CMakeLists.txt',
+     'COMPONENT Runtime RENAME librustdesk.dll)',
+     'COMPONENT Runtime RENAME maeremote_core.dll)'),
+    ('flutter/windows/runner/main.cpp',
+     'HINSTANCE hInstance = LoadLibraryA("librustdesk.dll");',
+     'HINSTANCE hInstance = LoadLibraryA("maeremote_core.dll");'),
+    ('flutter/windows/runner/main.cpp',
+     'std::cout << "Failed to load librustdesk.dll." << std::endl;',
+     'std::cout << "Failed to load maeremote_core.dll." << std::endl;'),
+    ('flutter/lib/models/native_model.dart',
+     "? DynamicLibrary.open('librustdesk.dll')",
+     "? DynamicLibrary.open('maeremote_core.dll')"),
+    ('src/privacy_mode/win_topmost_window.rs',
+     'pub const WIN_TOPMOST_INJECTED_PROCESS_EXE: &\'static str = "RuntimeBroker_rustdesk.exe";',
+     'pub const WIN_TOPMOST_INJECTED_PROCESS_EXE: &\'static str = "RuntimeBroker_maeremote.exe";'),
+    ('flutter/lib/desktop/pages/install_page.dart',
+     "              Option(printer, label: 'Install {$appName} Printer'),\n",
+     ''),
+    ('flutter/lib/desktop/pages/desktop_setting_page.dart',
+     "    if (isWindows &&\n        !bind.isDisableSettings() &&\n        bind.mainGetBuildinOption(key: kOptionHideRemotePrinterSetting) != 'Y')\n      SettingsTabKey.printer,\n",
+     ''),
+    ('flutter/lib/desktop/pages/desktop_setting_page.dart',
+     "            if (isWindows)\n              _OptionCheckBox(\n                  context, 'Enable remote printer', kOptionEnableRemotePrinter,\n                  enabled: enabled, fakeValue: fakeValue),\n",
+     ''),
+    ('src/auth_2fa.rs',
+     'const ISSUER: &str = "RustDesk";',
+     'const ISSUER: &str = "MAE Remote";'),
+    ('flutter/lib/common/widgets/toolbar.dart',
+     "    'https://github.com/rustdesk/rustdesk/issues/14586';",
+     "    'https://remote.maesuaisystem.com/';"),
+    ('flutter/lib/desktop/pages/desktop_setting_page.dart',
+     "                          Text(\n                            'Copyright © ${DateTime.now().toString().substring(0, 4)} MAE Remote Desktop\\nPortions © Purslane Tech Pte. Ltd. · GNU AGPL-3.0 · source: remote.maesuaisystem.com/source\\n$license',\n                            style: const TextStyle(color: Colors.white),\n                          ),",
+     "                          Text(\n                            'Copyright © ${DateTime.now().toString().substring(0, 4)} MAE Remote Desktop${license.isEmpty ? '' : '\\n$license'}',\n                            style: const TextStyle(color: Colors.white),\n                          ),\n                          // The licence notices (AGPL-3.0 section 5d) sit behind this link instead of in the box.\n                          InkWell(\n                            onTap: () => showDialog(\n                              context: context,\n                              builder: (ctx) => AlertDialog(\n                                title: const Text('Licence'),\n                                content: const SelectableText(\n                                    'MAE Remote Desktop includes open-source software.\\n\\n'\n                                    'Portions © Purslane Tech Pte. Ltd., licensed under the GNU Affero General '\n                                    'Public License version 3 (AGPL-3.0). You may copy, modify and share this '\n                                    'program under that licence. It comes WITHOUT ANY WARRANTY.\\n\\n'\n                                    'Licence text and complete source code:\\n'\n                                    'remote.maesuaisystem.com/source'),\n                                actions: [\n                                  TextButton(\n                                    onPressed: () => launchUrlString(\n                                        'https://remote.maesuaisystem.com/source/'),\n                                    child: const Text('Source code'),\n                                  ),\n                                  TextButton(\n                                    onPressed: () => Navigator.of(ctx).pop(),\n                                    child: Text(translate('OK')),\n                                  ),\n                                ],\n                              ),\n                            ),\n                            child: const Text(\n                              'Licence',\n                              style: TextStyle(\n                                  color: Colors.white,\n                                  fontSize: 12,\n                                  decoration: TextDecoration.underline),\n                            ).marginOnly(top: 4),\n                          ),"),
+    ('src/lang/en.rs',
+     '("doc_mac_permission", "https://rustdesk.com/docs/en/client/mac/#enable-permissions"),',
+     '("doc_mac_permission", "https://remote.maesuaisystem.com/"),'),
+    ('src/lang/en.rs',
+     '("doc_fix_wayland", "https://rustdesk.com/docs/en/client/linux/#x11-required"),',
+     '("doc_fix_wayland", "https://remote.maesuaisystem.com/"),'),
+    ('src/ui_session_interface.rs',
+     'join(format!("rustdesk_printer_{id}"))',
+     'join(format!("maeremote_printer_{id}"))'),
+    ('src/ui_session_interface.rs',
+     'usage:<br><br> rustdesk --port-forward',
+     'usage:<br><br> MAERemote --port-forward'),
+    ('src/rendezvous_mediator.rs',
+     'Run `rustdesk --deploy --token <api_token>`',
+     'Run `MAERemote --deploy --token <api_token>`'),
+    ('flutter/windows/runner/main.cpp',
+     'std::wstring app_name = L"RustDesk";',
+     'std::wstring app_name = L"MAE Remote";'),
+    ('src/privacy_mode/win_topmost_window.rs',
+     'PRIVACY_WINDOW_CLASS: &\'static str = "RustDeskPrivacyWindowClass";',
+     'PRIVACY_WINDOW_CLASS: &\'static str = "MAERemotePrivacyWindowClass";'),
+    ('src/privacy_mode/win_topmost_window.rs',
+     'PRIVACY_WINDOW_NAME: &\'static str = "RustDeskPrivacyWindow";',
+     'PRIVACY_WINDOW_NAME: &\'static str = "MAERemotePrivacyWindow";'),
+    ('libs/virtual_display/dylib/src/win10/IddController.c',
+     'Please try: Reinstall RustDesk with the cert option.',
+     'Please try: Reinstall MAE Remote with the cert option.'),
+    ('libs/virtual_display/dylib/src/win10/IddController.c',
+     'const char* g_msgHeader = "RustDeskIdd: ";',
+     'const char* g_msgHeader = "MAERemoteIdd: ";'),
+    ('.github/workflows/third-party-RustDeskTempTopMostWindow.yml',
+     '      - name: Build the project\n        run: |\n          cd RustDeskTempTopMostWindow && git checkout ecd8d6a139eee76845ea66423fb739af450fda90\n',
+     "      - name: Build the project\n        run: |\n          cd RustDeskTempTopMostWindow && git checkout ecd8d6a139eee76845ea66423fb739af450fda90\n          # MAE: the privacy window's title/class (Task Manager can show the title); src/privacy_mode/win_topmost_window.rs matches\n          (Get-Content -Raw WindowInjection/dllmain.cpp).Replace('RustDeskPrivacyWindow', 'MAERemotePrivacyWindow') | Set-Content -NoNewline -Encoding utf8 WindowInjection/dllmain.cpp\n          if (Select-String -Quiet -Pattern 'RustDeskPrivacyWindow' WindowInjection/dllmain.cpp) { throw 'privacy window rename failed' }\n"),
+    ('src/flutter_ffi.rs',
+     '    } else if key == "transfer-job-id" {',
+     '    } else if key == "mae-version" {\n        // MAE: the release shown to users, e.g. 1.5.0-9 (VERSION stays the upstream one for peer compatibility)\n        return format!("{}-{}", crate::VERSION, crate::common::MAE_BUILD);\n    } else if key == "transfer-job-id" {'),
+    ('src/platform/windows.rs',
+     '        version = crate::VERSION.replace("-", "."),',
+     '        version = format!("{}-{}", crate::VERSION, crate::common::MAE_BUILD),'),
+    ('src/platform/windows.rs',
+     '    let version = crate::VERSION.replace("-", ".");',
+     '    let version = format!("{}-{}", crate::VERSION, crate::common::MAE_BUILD);'),
+    ('flutter/lib/desktop/pages/desktop_setting_page.dart',
+     "child: Text('${translate('Version')}: $version')",
+     "child: Text('${translate('Version')}: ${bind.mainGetCommonSync(key: 'mae-version')}')"),
+    ('flutter/lib/desktop/pages/desktop_setting_page.dart',
+     "'Copyright © ${DateTime.now().toString().substring(0, 4)} MAE Remote Desktop${license.isEmpty ? '' : '\\n$license'}',",
+     "'MAE Remote Desktop ${bind.mainGetCommonSync(key: 'mae-version')}\\nCopyright © ${DateTime.now().toString().substring(0, 4)} MAE Remote Desktop${license.isEmpty ? '' : '\\n$license'}',"),
+    ('flutter/lib/desktop/pages/connection_page.dart',
+     'const url = "https://rustdesk.com/pricing";',
+     'const url = "https://remote.maesuaisystem.com/";'),
+    ('flutter/lib/desktop/pages/desktop_home_page.dart',
+     "? 'https://github.com/rustdesk/rustdesk/releases/tag/${bind.mainGetNewVersion()}'",
+     "? 'https://remote.maesuaisystem.com/'"),
+]
+
+# r10 (SignPath): ชุดติดตั้งเป็นโอเพนซอร์สทั้งหมด — ไม่มีไดรเวอร์จอเสมือน Amyuni จึงเสนอ virtual display เฉพาะเมื่อมีไฟล์ไดรเวอร์
+OSS_EDITS = [
+    ('src/virtual_display_manager.rs',
+     '    #[cfg(target_os = "windows")]\n    {\n        is_windows_version_or_greater(10, 0, 19041, 0, 0)\n    }',
+     '    #[cfg(target_os = "windows")]\n    {\n        // MAE: the Amyuni driver (closed source) is not shipped; offer virtual displays only when its files are present\n        is_windows_version_or_greater(10, 0, 19041, 0, 0)\n            && std::env::current_exe()\n                .ok()\n                .and_then(|p| p.parent().map(|d| d.join("usbmmidd_v2").exists()))\n                .unwrap_or(false)\n    }'),
+    ('src/server/terminal_service.rs',
+     '// vim, Claude Code, and other TUI applications hang when ConPTY is created',
+     '// vim and other TUI applications hang when ConPTY is created'),
+]
+
 # ลิงก์ที่มีหลายจุดในไฟล์เดียว: แทนทุกจุด (ต้องเจออย่างน้อย 1)
 EDITS_ALL = [
+    ('libs/portable/src/main.rs', 'RuntimeBroker_rustdesk.exe', 'RuntimeBroker_maeremote.exe'),
     ('flutter/lib/desktop/pages/desktop_setting_page.dart', 'https://rustdesk.com/privacy.html', f'{SITE}/privacy.html'),
     ('flutter/lib/desktop/pages/install_page.dart', 'https://rustdesk.com/privacy.html', f'{SITE}/privacy.html'),
     ('flutter/lib/mobile/pages/settings_page.dart', 'https://rustdesk.com/privacy.html', f'{SITE}/privacy.html'),
@@ -296,7 +629,7 @@ def write_icons(root):
 def main():
     root = pathlib.Path(sys.argv[1]).resolve()
     print('text edits:')
-    for rel, old, new in EDITS:
+    for rel, old, new in EDITS + TRAFFIC_EDITS + FIT_EDITS + INSTALL_EDITS + NAME_EDITS + OSS_EDITS:
         edit(root, rel, old, new)
     for rel, old, new in EDITS_ALL:
         edit(root, rel, old, new, all_=True)

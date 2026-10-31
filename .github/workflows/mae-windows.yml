@@ -241,12 +241,6 @@ jobs:
           python3 .\build.py --portable --flutter --skip-portable-pack --hwcodec ${{ matrix.job.build-args }}
           mv ./flutter/build/windows/${{ matrix.job.flutter-arch }}/runner/Release ./rustdesk
 
-          # Download usbmmidd_v2.zip and extract it to ./rustdesk
-          Invoke-WebRequest -Uri https://github.com/rustdesk-org/rdev/releases/download/usbmmidd_v2/usbmmidd_v2.zip -OutFile usbmmidd_v2.zip
-          Expand-Archive usbmmidd_v2.zip -DestinationPath .
-          Remove-Item -Path usbmmidd_v2\Win32 -Recurse
-          Remove-Item -Path "usbmmidd_v2\deviceinstaller64.exe", "usbmmidd_v2\deviceinstaller.exe", "usbmmidd_v2\usbmmidd.bat"
-          mv -Force .\usbmmidd_v2 ./rustdesk
 
 
       - name: find Runner.res

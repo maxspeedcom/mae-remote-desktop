@@ -26,7 +26,12 @@ pub fn get_cur_device_string() -> &'static str {
 pub fn is_virtual_display_supported() -> bool {
     #[cfg(target_os = "windows")]
     {
+        // MAE: the Amyuni driver (closed source) is not shipped; offer virtual displays only when its files are present
         is_windows_version_or_greater(10, 0, 19041, 0, 0)
+            && std::env::current_exe()
+                .ok()
+                .and_then(|p| p.parent().map(|d| d.join("usbmmidd_v2").exists()))
+                .unwrap_or(false)
     }
     #[cfg(not(target_os = "windows"))]
     {

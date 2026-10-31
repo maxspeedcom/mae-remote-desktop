@@ -64,6 +64,23 @@ old = './SignOutput/rustdesk-${{ env.VERSION }}-${{ matrix.job.arch }}.exe'
 if text.count(old) != 1:
     sys.exit('STOP: portable exe output line changed upstream')
 text = text.replace(old, './SignOutput/MAERemote-${{ env.VERSION }}-${{ matrix.job.arch }}.exe')
+# ตัวโปรแกรมในชุดติดตั้งต้องชื่อ <APP_NAME>.exe = MAERemote.exe: install_me คัดลอกโฟลเดอร์ทั้งก้อนโดยไม่เปลี่ยนชื่อ
+# แต่ shortcut / service / registry ชี้ไปที่ MAERemote.exe (r1-r8 ติดตั้งแล้ว icon เปิดไม่ได้) และไม่ให้เห็น rustdesk.exe ใน Task Manager
+old = '          python3 ./generate.py -f ../../rustdesk/ -o . -e ../../rustdesk/rustdesk.exe'
+if text.count(old) != 1:
+    sys.exit('STOP: portable packer line changed upstream')
+text = text.replace(old, '          mv ../../rustdesk/rustdesk.exe ../../rustdesk/MAERemote.exe\n'
+                         '          python3 ./generate.py -f ../../rustdesk/ -o . -e ../../rustdesk/MAERemote.exe')
+# ไม่ใส่ไดรเวอร์เครื่องพิมพ์ (โฟลเดอร์ drivers/RustDeskPrinterDriver + ชื่อไดรเวอร์ "RustDesk v4 Printer Driver" ที่เซ็นแล้ว)
+pat = re.compile(r'\n          # Download printer driver files and extract them to \./rustdesk\n.*?Write-Host "Ingore the printer driver error\."\n          \}\n', re.S)
+text, n = pat.subn('\n', text)
+if n != 1:
+    sys.exit('STOP: printer driver block changed upstream')
+# ไม่ใส่ไดรเวอร์จอเสมือน usbmmidd_v2 (Amyuni, closed source): ชุดติดตั้งต้องเป็นโอเพนซอร์สทั้งหมด (เงื่อนไข SignPath)
+pat = re.compile(r'\n          # Download usbmmidd_v2\.zip and extract it to \./rustdesk\n(?:          [^\n]*usbmmidd[^\n]*\n)+')
+text, n = pat.subn('\n', text)
+if n != 1:
+    sys.exit('STOP: usbmmidd block changed upstream')
 text += '''
       - name: Upload MAE Remote installer
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
