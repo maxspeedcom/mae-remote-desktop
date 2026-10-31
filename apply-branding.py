@@ -199,7 +199,7 @@ async fn mae_do_check_update() -> hbb_common::ResultType<()> {
     # AGPL: ต้องคงข้อความลิขสิทธิ์ของต้นฉบับไว้ในหน้า About (ไม่ใช้ชื่อแบรนด์ RustDesk)
     ('flutter/lib/desktop/pages/desktop_setting_page.dart',
      "'Copyright © ${DateTime.now().toString().substring(0, 4)} Purslane Tech Pte. Ltd.\\n$license',",
-     "'Copyright © ${DateTime.now().toString().substring(0, 4)} MAE Remote Desktop\\nPortions © Purslane Tech Pte. Ltd. · GNU AGPL-3.0 · github.com/maxspeedcom/mae-remote-desktop\\n$license',"),
+     "'Copyright © ${DateTime.now().toString().substring(0, 4)} MAE Remote Desktop\\nPortions © Purslane Tech Pte. Ltd. · GNU AGPL-3.0 · source: remote.maesuaisystem.com/source\\n$license',"),
     ('flutter/lib/desktop/pages/desktop_setting_page.dart', "translate('Slogan_tip'),", "'remote.maesuaisystem.com',"),
     # "Powered by RustDesk" label under the logo (links to rustdesk.com): always hidden
     ('flutter/lib/common.dart', 'if (bind.mainGetBuildinOption(key: "hide-powered-by-me") == \'Y\') {',

@@ -2580,7 +2580,7 @@ class _AboutState extends State<_About> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Copyright © ${DateTime.now().toString().substring(0, 4)} MAE Remote Desktop\nPortions © Purslane Tech Pte. Ltd. · GNU AGPL-3.0 · github.com/maxspeedcom/mae-remote-desktop\n$license',
+                            'Copyright © ${DateTime.now().toString().substring(0, 4)} MAE Remote Desktop\nPortions © Purslane Tech Pte. Ltd. · GNU AGPL-3.0 · source: remote.maesuaisystem.com/source\n$license',
                             style: const TextStyle(color: Colors.white),
                           ),
                           Text(

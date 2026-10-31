@@ -5,7 +5,7 @@
 Remote desktop software: connect to any computer with its 9-digit ID. Encrypted end to end, servers in Thailand, free to use.
 
 - เว็บไซต์และดาวน์โหลด / Website and download: https://remote.maesuaisystem.com
-- ไฟล์ติดตั้งทุกรุ่น / All builds: [Releases](https://github.com/maxspeedcom/mae-remote-desktop/releases) (Windows 10/11, 64-bit)
+- ไฟล์ติดตั้งและซอร์สโค้ดทุกรุ่น / Builds and source code: https://remote.maesuaisystem.com/source/ (Windows 10/11, 64-bit)
 
 ## สัญญาอนุญาต / License
 
