@@ -1030,7 +1030,7 @@ pub fn check_software_update() {
 
 // MAE Remote update notice. Bump MAE_BUILD for every release and keep
 // https://remote.maesuaisystem.com/version.json ({"build": N, "version": "1.5.0-N"}) in step.
-pub const MAE_BUILD: u64 = 7;
+pub const MAE_BUILD: u64 = 8;
 const MAE_VERSION_URL: &str = "https://remote.maesuaisystem.com/version.json";
 
 fn mae_check_update() {

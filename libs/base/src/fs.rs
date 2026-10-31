@@ -1343,6 +1343,16 @@ pub async fn handle_read_jobs(
     jobs: &mut Vec<TransferJob>,
     stream: &mut hbb_common::Stream,
 ) -> ResultType<String> {
+    let mut sent = 0;
+    handle_read_jobs_counted(jobs, stream, &mut sent).await
+}
+
+/// MAE: `handle_read_jobs` that also adds the file bytes it sends to `sent` (the traffic report).
+pub async fn handle_read_jobs_counted(
+    jobs: &mut Vec<TransferJob>,
+    stream: &mut hbb_common::Stream,
+    sent: &mut u64,
+) -> ResultType<String> {
     init_jobs(jobs, stream).await?;
 
     let mut job_log = Default::default();
@@ -1358,6 +1368,7 @@ pub async fn handle_read_jobs(
                     .await?;
             }
             Ok(Some(block)) => {
+                *sent += block.data.len() as u64;
                 stream.send(&new_block(block)).await?;
             }
             Ok(None) => {

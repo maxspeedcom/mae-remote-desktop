@@ -353,11 +353,65 @@ impl TerminalUserToken {
         }
     }
 }
+/// MAE: the peer stream with byte counters for the traffic report (see `post_traffic`). The methods
+/// below shadow the `Stream` methods of the same name; everything else reaches the stream via Deref.
+struct CountedStream {
+    inner: super::Stream,
+    tx: u64,
+    rx: u64,
+}
+
+impl std::ops::Deref for CountedStream {
+    type Target = super::Stream;
+    fn deref(&self) -> &super::Stream {
+        &self.inner
+    }
+}
+
+impl std::ops::DerefMut for CountedStream {
+    fn deref_mut(&mut self) -> &mut super::Stream {
+        &mut self.inner
+    }
+}
+
+impl CountedStream {
+    #[inline]
+    async fn send(&mut self, msg: &impl hbb_common::protobuf::Message) -> ResultType<()> {
+        self.tx += hbb_common::protobuf::Message::compute_size(msg) as u64;
+        self.inner.send(msg).await
+    }
+
+    #[inline]
+    async fn send_raw(&mut self, bytes: Vec<u8>) -> ResultType<()> {
+        self.tx += bytes.len() as u64;
+        self.inner.send_raw(bytes).await
+    }
+
+    #[inline]
+    async fn send_bytes(&mut self, bytes: hbb_common::bytes::Bytes) -> ResultType<()> {
+        self.tx += bytes.len() as u64;
+        self.inner.send_bytes(bytes).await
+    }
+
+    #[inline]
+    async fn next(&mut self) -> Option<Result<hbb_common::bytes::BytesMut, std::io::Error>> {
+        let res = self.inner.next().await;
+        if let Some(Ok(bytes)) = &res {
+            self.rx += bytes.len() as u64;
+        }
+        res
+    }
+}
+
 pub struct Connection {
     inner: ConnInner,
     display_idx: usize,
-    stream: super::Stream,
+    stream: CountedStream,
     server: super::ServerPtrWeak,
+    // MAE: totals in the last traffic report, when it was sent, and whether it is still on its way
+    traffic_reported: (u64, u64),
+    traffic_last: Instant,
+    traffic_busy: Arc<AtomicBool>,
     hash: Hash,
     read_jobs: Vec<fs::TransferJob>,
     timer: crate::RustDeskInterval,
@@ -572,8 +626,11 @@ impl Connection {
             // Defer display enumeration until login succeeds. Monitor login replaces this
             // with the primary index returned with the refreshed display snapshot.
             display_idx: 0,
-            stream,
+            stream: CountedStream { inner: stream, tx: 0, rx: 0 },
             server,
+            traffic_reported: (0, 0),
+            traffic_last: Instant::now(),
+            traffic_busy: Arc::new(AtomicBool::new(false)),
             hash,
             read_jobs: Vec::new(),
             timer: crate::rustdesk_interval(time::interval(SEC30)),
@@ -1049,7 +1106,7 @@ impl Connection {
                 _ = conn.file_timer.tick() => {
                     if !conn.read_jobs.is_empty() {
                         conn.send_to_cm(ipc::Data::FileTransferLog(("transfer".to_string(), fs::serialize_transfer_jobs(&conn.read_jobs))));
-                        match fs::handle_read_jobs(&mut conn.read_jobs, &mut conn.stream).await {
+                        match fs::handle_read_jobs_counted(&mut conn.read_jobs, &mut conn.stream.inner, &mut conn.stream.tx).await {
                             Ok(log) => {
                                 if !log.is_empty() {
                                     conn.send_to_cm(ipc::Data::FileTransferLog(("transfer".to_string(), log)));
@@ -1168,6 +1225,7 @@ impl Connection {
                         }
                     }
                     conn.file_remove_log_control.on_timer().drain(..).map(|x| conn.send_to_cm(x)).count();
+                    conn.post_traffic();
                     #[cfg(feature = "hwcodec")]
                     conn.update_supported_encoding();
                 }
@@ -1226,6 +1284,8 @@ impl Connection {
 
         conn.post_conn_audit(json!({
             "action": "close",
+            "tx": conn.stream.tx,
+            "rx": conn.stream.rx,
         }));
         if let Some(s) = conn.server.upgrade() {
             let mut s = s.write().unwrap();
@@ -1331,6 +1391,7 @@ impl Connection {
             log::info!("Running port forwarding loop");
             self.stream.set_raw();
             let mut hbbs_rx = crate::hbbs_http::sync::signal_receiver();
+            let mut traffic_timer = crate::rustdesk_interval(time::interval(Duration::from_secs(1)));
             loop {
                 tokio::select! {
                     Some(data) = rx_from_cm.recv() => {
@@ -1368,6 +1429,7 @@ impl Connection {
                             bail!("Stream reset by the peer");
                         }
                     },
+                    _ = traffic_timer.tick() => self.post_traffic(),
                     _ = self.timer.tick() => {
                         if last_recv_time.elapsed() >= H1 {
                             bail!("Timeout");
@@ -1560,6 +1622,39 @@ impl Connection {
         // Unique per record; the api server dedups retried posts by it.
         v["nonce"] = json!(uuid::Uuid::new_v4().to_string());
         allow_err!(self.tx_post_seq.send((url, v)));
+    }
+
+    /// MAE: this connection's running byte totals, at most every 5 s and only when they changed, so the
+    /// monitor shows live traffic for direct sessions too. One attempt and no queue: the next report
+    /// carries the totals anyway, and the "close" record (posted with retries) carries the final ones.
+    fn post_traffic(&mut self) {
+        let now = (self.stream.tx, self.stream.rx);
+        if !self.authorized
+            || self.server_audit_conn.is_empty()
+            || now == self.traffic_reported
+            || self.traffic_last.elapsed() < Duration::from_secs(5)
+            || self.traffic_busy.swap(true, Ordering::AcqRel)
+        {
+            return;
+        }
+        self.traffic_reported = now;
+        self.traffic_last = Instant::now();
+        let url = self.server_audit_conn.clone();
+        let body = json!({
+            "action": "traffic",
+            "id": Config::get_id(),
+            "uuid": crate::encode64(hbb_common::get_uuid()),
+            "conn_id": self.inner.id,
+            "session_id": self.lr.session_id,
+            "tx": now.0,
+            "rx": now.1,
+        })
+        .to_string();
+        let busy = self.traffic_busy.clone();
+        tokio::spawn(async move {
+            allow_err!(crate::post_request(url, body, "").await);
+            busy.store(false, Ordering::Release);
+        });
     }
 
     fn get_files_for_audit(job_type: fs::JobType, mut files: Vec<FileEntry>) -> Vec<(String, i64)> {
