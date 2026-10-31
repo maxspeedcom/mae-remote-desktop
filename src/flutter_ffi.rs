@@ -2692,6 +2692,9 @@ pub fn main_get_common(key: String) -> String {
         return crate::platform::is_win_10_or_greater().to_string();
         #[cfg(not(target_os = "windows"))]
         return false.to_string();
+    } else if key == "mae-version" {
+        // MAE: the release shown to users, e.g. 1.5.0-9 (VERSION stays the upstream one for peer compatibility)
+        return format!("{}-{}", crate::VERSION, crate::common::MAE_BUILD);
     } else if key == "transfer-job-id" {
         return base::fs::get_next_job_id().to_string();
     } else if key == "is-remote-modify-enabled-by-control-permissions" {

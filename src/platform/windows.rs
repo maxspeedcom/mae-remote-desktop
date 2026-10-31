@@ -1755,7 +1755,7 @@ copy /Y \"{tmp_path}\\Uninstall {app_name}.lnk\" \"{path}\\\"
     ",
         display_icon = shortcut_icon_location.as_deref().unwrap_or(exe.as_str()),
         nested_exe = escape_nested_cmd_ampersands(&exe),
-        version = crate::VERSION.replace("-", "."),
+        version = format!("{}-{}", crate::VERSION, crate::common::MAE_BUILD),
         build_date = crate::BUILD_DATE,
         after_install = get_after_install(
             &exe,
@@ -3456,7 +3456,7 @@ pub fn update_me(debug: bool) -> ResultType<()> {
     if versions.len() > 2 {
         version_build = versions[2];
     }
-    let version = crate::VERSION.replace("-", ".");
+    let version = format!("{}-{}", crate::VERSION, crate::common::MAE_BUILD);
     let size = get_directory_size_kb(&path);
     let build_date = crate::BUILD_DATE;
     // Use the icon in the previous installation directory if possible.

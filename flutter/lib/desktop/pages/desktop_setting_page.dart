@@ -2532,7 +2532,7 @@ class _AboutState extends State<_About> {
                 height: 8.0,
               ),
               SelectionArea(
-                  child: Text('${translate('Version')}: $version')
+                  child: Text('${translate('Version')}: ${bind.mainGetCommonSync(key: 'mae-version')}')
                       .marginSymmetric(vertical: 4.0)),
               SelectionArea(
                   child: Text('${translate('Build Date')}: $buildDate')
@@ -2572,7 +2572,7 @@ class _AboutState extends State<_About> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Copyright © ${DateTime.now().toString().substring(0, 4)} MAE Remote Desktop${license.isEmpty ? '' : '\n$license'}',
+                            'MAE Remote Desktop ${bind.mainGetCommonSync(key: 'mae-version')}\nCopyright © ${DateTime.now().toString().substring(0, 4)} MAE Remote Desktop${license.isEmpty ? '' : '\n$license'}',
                             style: const TextStyle(color: Colors.white),
                           ),
                           // The licence notices (AGPL-3.0 section 5d) sit behind this link instead of in the box.
