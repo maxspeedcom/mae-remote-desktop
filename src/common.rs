@@ -1035,6 +1035,24 @@ const MAE_VERSION_URL: &str = "https://remote.maesuaisystem.com/version.json";
 
 fn mae_check_update() {
     std::thread::spawn(move || allow_err!(mae_do_check_update()));
+    std::thread::spawn(mae_fit_saved_peers);
+}
+
+/// MAE build 8: the remote screen fits the window by default ("adaptive", no scroll bars). Computers saved by
+/// older builds kept "original" (1:1 with scroll bars) only because it was the old default, so move them once.
+/// A choice made after this (toolbar -> Display) is kept.
+fn mae_fit_saved_peers() {
+    const DONE: &str = "mae-view-fit-migrated";
+    if LocalConfig::get_option(DONE) == "Y" {
+        return;
+    }
+    for (id, _, mut cfg) in config::PeerConfig::peers(None) {
+        if cfg.view_style == "original" {
+            cfg.view_style = "adaptive".to_owned();
+            cfg.store(&id);
+        }
+    }
+    LocalConfig::set_option(DONE.to_owned(), "Y".to_owned());
 }
 
 #[tokio::main(flavor = "current_thread")]
