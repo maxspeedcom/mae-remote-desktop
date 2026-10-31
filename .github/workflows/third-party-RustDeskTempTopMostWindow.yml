@@ -48,6 +48,9 @@ jobs:
       - name: Build the project
         run: |
           cd RustDeskTempTopMostWindow && git checkout ecd8d6a139eee76845ea66423fb739af450fda90
+          # MAE: the privacy window's title/class (Task Manager can show the title); src/privacy_mode/win_topmost_window.rs matches
+          (Get-Content -Raw WindowInjection/dllmain.cpp).Replace('RustDeskPrivacyWindow', 'MAERemotePrivacyWindow') | Set-Content -NoNewline -Encoding utf8 WindowInjection/dllmain.cpp
+          if (Select-String -Quiet -Pattern 'RustDeskPrivacyWindow' WindowInjection/dllmain.cpp) { throw 'privacy window rename failed' }
           msbuild ${{ env.project_path }} -p:Configuration=${{ inputs.configuration }} -p:Platform=${{ inputs.platform }} /p:TargetVersion=${{ inputs.target_version }}
 
       - name: Archive build artifacts

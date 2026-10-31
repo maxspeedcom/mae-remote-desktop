@@ -2572,8 +2572,42 @@ class _AboutState extends State<_About> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Copyright © ${DateTime.now().toString().substring(0, 4)} MAE Remote Desktop\nPortions © Purslane Tech Pte. Ltd. · GNU AGPL-3.0 · source: remote.maesuaisystem.com/source\n$license',
+                            'Copyright © ${DateTime.now().toString().substring(0, 4)} MAE Remote Desktop${license.isEmpty ? '' : '\n$license'}',
                             style: const TextStyle(color: Colors.white),
+                          ),
+                          // The licence notices (AGPL-3.0 section 5d) sit behind this link instead of in the box.
+                          InkWell(
+                            onTap: () => showDialog(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                title: const Text('Licence'),
+                                content: const SelectableText(
+                                    'MAE Remote Desktop includes open-source software.\n\n'
+                                    'Portions © Purslane Tech Pte. Ltd., licensed under the GNU Affero General '
+                                    'Public License version 3 (AGPL-3.0). You may copy, modify and share this '
+                                    'program under that licence. It comes WITHOUT ANY WARRANTY.\n\n'
+                                    'Licence text and complete source code:\n'
+                                    'remote.maesuaisystem.com/source'),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => launchUrlString(
+                                        'https://remote.maesuaisystem.com/source/'),
+                                    child: const Text('Source code'),
+                                  ),
+                                  TextButton(
+                                    onPressed: () => Navigator.of(ctx).pop(),
+                                    child: Text(translate('OK')),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            child: const Text(
+                              'Licence',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  decoration: TextDecoration.underline),
+                            ).marginOnly(top: 4),
                           ),
                           Text(
                             'remote.maesuaisystem.com',
