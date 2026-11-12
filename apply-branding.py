@@ -527,6 +527,9 @@ NAME_EDITS = [
     ('flutter/lib/desktop/pages/desktop_home_page.dart',
      "? 'https://github.com/rustdesk/rustdesk/releases/tag/${bind.mainGetNewVersion()}'",
      "? 'https://remote.maesuaisystem.com/'"),
+    ('flutter/windows/runner/service_control.h',
+     'L"RustDesk service control failed with Windows error %lu\\n",',
+     'L"MAE Remote service control failed with Windows error %lu\\n",'),
 ]
 
 # r10 (SignPath): ชุดติดตั้งเป็นโอเพนซอร์สทั้งหมด — ไม่มีไดรเวอร์จอเสมือน Amyuni จึงเสนอ virtual display เฉพาะเมื่อมีไฟล์ไดรเวอร์
