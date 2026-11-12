@@ -539,6 +539,13 @@ OSS_EDITS = [
      '// vim and other TUI applications hang when ConPTY is created'),
 ]
 
+# ชื่องานของ workflow ที่ mae-windows.yml เรียกใช้ (ไม่ให้ชื่อต้นทางขึ้นในหน้า Actions)
+WORKFLOW_EDITS = [
+    ('.github/workflows/flutter-build.yml', 'name: Build the flutter version of the RustDesk\n', 'name: Build (reusable)\n'),
+    ('.github/workflows/third-party-RustDeskTempTopMostWindow.yml', 'name: build RustDeskTempTopMostWindow\n',
+     'name: Build window helper (reusable)\n'),
+]
+
 # ลิงก์ที่มีหลายจุดในไฟล์เดียว: แทนทุกจุด (ต้องเจออย่างน้อย 1)
 EDITS_ALL = [
     ('libs/portable/src/main.rs', 'RuntimeBroker_rustdesk.exe', 'RuntimeBroker_maeremote.exe'),
@@ -629,7 +636,7 @@ def write_icons(root):
 def main():
     root = pathlib.Path(sys.argv[1]).resolve()
     print('text edits:')
-    for rel, old, new in EDITS + TRAFFIC_EDITS + FIT_EDITS + INSTALL_EDITS + NAME_EDITS + OSS_EDITS:
+    for rel, old, new in EDITS + TRAFFIC_EDITS + FIT_EDITS + INSTALL_EDITS + NAME_EDITS + OSS_EDITS + WORKFLOW_EDITS:
         edit(root, rel, old, new)
     for rel, old, new in EDITS_ALL:
         edit(root, rel, old, new, all_=True)
