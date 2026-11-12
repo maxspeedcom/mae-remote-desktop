@@ -1,9 +1,9 @@
 # MAE Remote Desktop
 
-MAE Remote Desktop is a modified version of an open-source remote desktop program, version 1.5.0,
+MAE Remote Desktop is a modified version of an open-source remote desktop program, version 1.5.3,
 distributed under the same license (GNU AGPL-3.0, see `LICENCE`).
 
-## Changes from the upstream 1.5.0 source
+## Changes from the upstream 1.5.3 source
 
 - App name `MAERemote`, organisation `com.maesuaisystem`.
 - Default rendezvous/relay server `rd.maesuaisystem.com` with its public key.
@@ -28,3 +28,4 @@ All changes are applied by `apply-branding.py`; source for every released build 
 - Build 9, text: the About page shows "© MAE Remote Desktop" with a "Licence" link that opens the licence notices (original copyright, AGPL-3.0, no warranty, where to get the source); the privacy-mode window is named MAERemotePrivacyWindow (the helper DLL source is patched before it is built); help links, the runner's fallback title, a temp folder, CLI usage text and virtual-display error messages use the MAE Remote name.
 - Build 9, version: the About page and Windows Apps & features show the release as `1.5.0-<build>` (e.g. 1.5.0-9); the protocol version sent to peers stays the upstream 1.5.0.
 - Build 10: the installer contains open-source components only — the closed-source virtual display driver (usbmmidd_v2) is no longer packaged, and virtual displays are offered only when that driver's files are present. The repository includes CODE_SIGNING_POLICY.md and CODE_OF_CONDUCT.md.
+- Build 10 is based on upstream 1.5.3 (security fixes for the Windows installer and service IPC, relay address binding, blocked sensitive options in strategy updates, download path validation). The release shows as 1.5.3-10. The whole tree is produced by `update-upstream.sh 1.5.3`; the reusable workflows get neutral display names (`WORKFLOW_EDITS`).

@@ -10,7 +10,7 @@ Until then, releases are not code signed.
 ## What gets signed
 
 - Only the Windows installer (`MAERemote-<version>-x86_64.exe`) built by this repository's GitHub Actions workflow
-  `.github/workflows/mae-windows.yml`, from a commit on the `mae-1.5.0` branch, on GitHub-hosted runners.
+  `.github/workflows/mae-windows.yml`, from a commit on the `mae` branch, on GitHub-hosted runners.
 - Nothing built on a developer machine is submitted for signing.
 - Every signing request is approved by hand by an approver (see below) before it is signed.
 - The private key is held by SignPath on its hardware security module; the project never has access to it.
