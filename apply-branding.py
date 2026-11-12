@@ -15,7 +15,7 @@ APP_NAME = 'MAERemote'          # ห้ามมีช่องว่าง: �
 DISPLAY = 'MAE Remote Desktop'
 SHORT = 'MAE Remote'  # ชื่อสั้นที่แสดงบนหน้าต่าง/แถบงาน
 HOST = 'rd.maesuaisystem.com'
-PUB_KEY = 'jSmZ2nHQNrvAjH8dTHgA6yS1q4fOaLLLdjDMo8cobcQ='
+PUB_KEY = 'X4DaqKgTS+rWkmMgmOqnImJSZalvrKzQLGW5JqB4i0E='   # since r10 (2026-11-12); the key before it was rotated
 SITE = 'https://remote.maesuaisystem.com'
 COPYRIGHT = 'Copyright © 2026 MAE Remote Desktop'
 
