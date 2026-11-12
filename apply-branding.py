@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ใส่แบรนด์ MAE Remote ลงซอร์ส RustDesk (ทดสอบกับแท็ก 1.5.0)
+"""ใส่แบรนด์ MAE Remote ลงซอร์สต้นทาง (ทดสอบกับแท็ก 1.5.0 และ 1.5.3; ใช้ผ่าน update-upstream.sh)
 
 ใช้: python3 apply-branding.py <rustdesk-source-dir>
 ทุกจุดต้องเจอข้อความเดิม "พอดี 1 ครั้ง" ไม่งั้นหยุดทันที (upstream เปลี่ยนแล้ว ต้องตรวจเอง)
@@ -100,7 +100,7 @@ EDITS = [
      '''// No need to check `danger_accept_invalid_cert` for now.
 // Because the url is always `https://api.rustdesk.com/version/latest`.''',
      '''// MAE Remote update notice. Bump MAE_BUILD for every release and keep
-// https://remote.maesuaisystem.com/version.json ({"build": N, "version": "1.5.0-N"}) in step.
+// https://remote.maesuaisystem.com/version.json ({"build": N, "version": "<upstream version>-N"}) in step.
 pub const MAE_BUILD: u64 = 10;
 const MAE_VERSION_URL: &str = "https://remote.maesuaisystem.com/version.json";
 
@@ -508,7 +508,7 @@ NAME_EDITS = [
      "      - name: Build the project\n        run: |\n          cd RustDeskTempTopMostWindow && git checkout ecd8d6a139eee76845ea66423fb739af450fda90\n          # MAE: the privacy window's title/class (Task Manager can show the title); src/privacy_mode/win_topmost_window.rs matches\n          (Get-Content -Raw WindowInjection/dllmain.cpp).Replace('RustDeskPrivacyWindow', 'MAERemotePrivacyWindow') | Set-Content -NoNewline -Encoding utf8 WindowInjection/dllmain.cpp\n          if (Select-String -Quiet -Pattern 'RustDeskPrivacyWindow' WindowInjection/dllmain.cpp) { throw 'privacy window rename failed' }\n"),
     ('src/flutter_ffi.rs',
      '    } else if key == "transfer-job-id" {',
-     '    } else if key == "mae-version" {\n        // MAE: the release shown to users, e.g. 1.5.0-9 (VERSION stays the upstream one for peer compatibility)\n        return format!("{}-{}", crate::VERSION, crate::common::MAE_BUILD);\n    } else if key == "transfer-job-id" {'),
+     '    } else if key == "mae-version" {\n        // MAE: the release shown to users, e.g. 1.5.3-10 (VERSION stays the upstream one for peer compatibility)\n        return format!("{}-{}", crate::VERSION, crate::common::MAE_BUILD);\n    } else if key == "transfer-job-id" {'),
     ('src/platform/windows.rs',
      '        version = crate::VERSION.replace("-", "."),',
      '        version = format!("{}-{}", crate::VERSION, crate::common::MAE_BUILD),'),

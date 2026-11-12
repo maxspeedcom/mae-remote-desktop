@@ -81,6 +81,11 @@ pat = re.compile(r'\n          # Download usbmmidd_v2\.zip and extract it to \./
 text, n = pat.subn('\n', text)
 if n != 1:
     sys.exit('STOP: usbmmidd block changed upstream')
+# job validate-update-metadata-keys (คีย์ช่องอัปเดตของต้นทาง) ไม่ได้อยู่ใน workflow ของเรา: ตัด needs ที่ชี้ไปหามันออก
+old = '    needs: [validate-update-metadata-keys]\n'
+if text.count(old) not in (0, 2):
+    sys.exit('STOP: validate-update-metadata-keys needs changed upstream')
+text = text.replace(old, '')
 text += '''
       - name: Upload MAE Remote installer
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
