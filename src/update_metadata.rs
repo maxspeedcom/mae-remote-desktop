@@ -20,19 +20,19 @@ use artifact::{validate_artifact, validate_artifact_file_name, ArtifactUrlPolicy
 #[cfg(target_os = "macos")]
 pub(crate) use offline::{verify_offline_update_metadata, OfflineUpdateMetadataRequirements};
 
-const UPDATE_METADATA_SIGNATURE_CONTEXT: &[u8] = b"RustDesk update metadata v1\n";
-const UPDATE_APP: &str = "rustdesk";
-pub(crate) const PUBLIC_UPDATE_PACKAGE_ID: &str = "rustdesk";
+const UPDATE_METADATA_SIGNATURE_CONTEXT: &[u8] = b"MAE Remote update metadata v1\n";
+const UPDATE_APP: &str = "maeremote";
+pub(crate) const PUBLIC_UPDATE_PACKAGE_ID: &str = "maeremote";
 const METADATA_SCHEMA_VERSION: u32 = 1;
 const SIGNATURE_SCHEMA_VERSION: u32 = 1;
 const SIGNATURE_ALGORITHM: &str = "ed25519";
 
+// MAE: only the MAE update key is trusted (public half of /root/.mae-remote/update-signing.key on code-server)
 const TRUSTED_UPDATE_KEYS: &[TrustedUpdateKey] = &[TrustedUpdateKey {
-    key_id: "2026-ed25519-main",
+    key_id: "mae-2026-11-ed25519",
     algorithm: SIGNATURE_ALGORITHM,
     public_key: [
-        52, 214, 32, 65, 191, 134, 137, 75, 157, 74, 67, 221, 150, 161, 118, 215, 218, 35, 236,
-        156, 127, 120, 133, 156, 197, 141, 37, 22, 47, 106, 181, 177,
+        13, 156, 104, 21, 185, 193, 144, 125, 5, 60, 159, 187, 155, 91, 129, 113, 45, 110, 204, 215, 198, 55, 199, 0, 116, 94, 103, 29, 43, 238, 98, 204,
     ],
 }];
 

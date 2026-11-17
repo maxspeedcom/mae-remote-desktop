@@ -20,6 +20,6 @@ done
 python3 "$DIR/apply-branding.py" "$NEW" > "$NEW.apply.log" || { tail -3 "$NEW.apply.log"; exit 1; }
 python3 "$DIR/gen-workflow.py" "$NEW"
 for f in README.md MAE-CHANGES.md CODE_SIGNING_POLICY.md CODE_OF_CONDUCT.md; do cp "$DIR/rustdesk/$f" "$NEW/$f"; done
-cp "$DIR/apply-branding.py" "$DIR/gen-workflow.py" "$DIR/update-upstream.sh" "$NEW/"
+cp "$DIR/apply-branding.py" "$DIR/gen-workflow.py" "$DIR/update-upstream.sh" "$DIR/sign-update.py" "$NEW/"
 rsync -a --delete --exclude .git "$NEW/" "$DIR/rustdesk/"
 echo "rustdesk/ = upstream $TAG + MAE changes. Review: git -C rustdesk status --short; git -C rustdesk diff --stat"

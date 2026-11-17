@@ -101,7 +101,7 @@ EDITS = [
 // Because the url is always `https://api.rustdesk.com/version/latest`.''',
      '''// MAE Remote update notice. Bump MAE_BUILD for every release and keep
 // https://remote.maesuaisystem.com/version.json ({"build": N, "version": "<upstream version>-N"}) in step.
-pub const MAE_BUILD: u64 = 10;
+pub const MAE_BUILD: u64 = 11;
 const MAE_VERSION_URL: &str = "https://remote.maesuaisystem.com/version.json";
 
 fn mae_check_update() {
@@ -549,6 +549,40 @@ WORKFLOW_EDITS = [
      'name: Build window helper (reusable)\n'),
 ]
 
+# r11: อัปเดตอัตโนมัติผ่าน release ของเราบน GitHub + ข้อมูลรุ่นที่เซ็นด้วยกุญแจ MAE (sign-update.py ตอน publish)
+AUTOUPDATE_EDITS = [
+    ('libs/hbb_common/src/config.rs',
+     '    pub static ref DEFAULT_SETTINGS: RwLock<HashMap<String, String>> = Default::default();',
+     '    // MAE: automatic updates are on unless the user turns them off (Settings > General > Auto update)\n    pub static ref DEFAULT_SETTINGS: RwLock<HashMap<String, String>> =\n        RwLock::new(HashMap::from([("allow-auto-update".to_owned(), "Y".to_owned())]));'),
+    ('src/update_metadata.rs',
+     'const UPDATE_METADATA_SIGNATURE_CONTEXT: &[u8] = b"RustDesk update metadata v1\\n";',
+     'const UPDATE_METADATA_SIGNATURE_CONTEXT: &[u8] = b"MAE Remote update metadata v1\\n";'),
+    ('src/update_metadata.rs',
+     'const UPDATE_APP: &str = "rustdesk";',
+     'const UPDATE_APP: &str = "maeremote";'),
+    ('src/update_metadata.rs',
+     'pub(crate) const PUBLIC_UPDATE_PACKAGE_ID: &str = "rustdesk";',
+     'pub(crate) const PUBLIC_UPDATE_PACKAGE_ID: &str = "maeremote";'),
+    ('src/update_metadata.rs',
+     'const TRUSTED_UPDATE_KEYS: &[TrustedUpdateKey] = &[TrustedUpdateKey {\n    key_id: "2026-ed25519-main",\n    algorithm: SIGNATURE_ALGORITHM,\n    public_key: [\n        52, 214, 32, 65, 191, 134, 137, 75, 157, 74, 67, 221, 150, 161, 118, 215, 218, 35, 236,\n        156, 127, 120, 133, 156, 197, 141, 37, 22, 47, 106, 181, 177,\n    ],\n}];',
+     '// MAE: only the MAE update key is trusted (public half of /root/.mae-remote/update-signing.key on code-server)\nconst TRUSTED_UPDATE_KEYS: &[TrustedUpdateKey] = &[TrustedUpdateKey {\n    key_id: "mae-2026-11-ed25519",\n    algorithm: SIGNATURE_ALGORITHM,\n    public_key: [\n        13, 156, 104, 21, 185, 193, 144, 125, 5, 60, 159, 187, 155, 91, 129, 113, 45, 110, 204, 215, 198, 55, 199, 0, 116, 94, 103, 29, 43, 238, 98, 204,\n    ],\n}];'),
+    ('src/updater.rs',
+     'fn check_update(manually: bool) -> ResultType<()> {\n    if crate::is_custom_client() {\n        return Ok(());\n    }\n',
+     'fn check_update(manually: bool) -> ResultType<()> {\n    if crate::is_custom_client() {\n        // MAE: own update channel (signed metadata on the MAE GitHub releases), see mae_check_update\n        #[cfg(target_os = "windows")]\n        {\n            return mae_check_update(manually);\n        }\n        #[cfg(not(target_os = "windows"))]\n        {\n            return Ok(());\n        }\n    }\n'),
+    ('src/updater.rs',
+     '#[cfg(target_os = "windows")]\nfn verified_update_path(\n',
+     '/// MAE: install the release named in https://remote.maesuaisystem.com/version.json when its build is newer than\n/// MAE_BUILD. The installer and its metadata come from that release on GitHub, and the metadata must carry a valid\n/// signature by the MAE update key, so the website alone cannot make a client install anything.\n#[cfg(target_os = "windows")]\nfn mae_check_update(manually: bool) -> ResultType<()> {\n    if !(manually || config::Config::get_bool_option(keys::OPTION_ALLOW_AUTO_UPDATE)) {\n        return Ok(());\n    }\n    let Some(artifact) = artifact::mae_verified_update_artifact()? else {\n        log::debug!("No update available.");\n        return Ok(());\n    };\n    let Some(file_path) = get_update_download_file_from_url(&artifact.url) else {\n        bail!("Failed to get the file path from the URL: {}", artifact.url);\n    };\n    ensure_verified_update_artifact(&artifact.url, &file_path, artifact.size, &artifact.sha256)?;\n    if has_no_active_conns() {\n        update_new_version(false, &artifact.version, &file_path, &artifact.sha256);\n    }\n    Ok(())\n}\n\n#[cfg(target_os = "windows")]\nfn verified_update_path(\n'),
+    ('src/updater.rs',
+     '                let custom_client_staging_dir = if crate::is_custom_client() {',
+     '                // MAE: no custom.txt to carry over, so no staging folder (it would be named after upstream)\n                let custom_client_staging_dir = if false && crate::is_custom_client() {'),
+    ('src/updater/artifact.rs',
+     '    if owner != "rustdesk"\n        || repo != "rustdesk"',
+     '    if owner != "maxspeedcom"\n        || repo != "mae-remote-desktop"'),
+    ('src/updater/artifact.rs',
+     'fn fetch_update_sidecar_bytes(url: &str) -> ResultType<Vec<u8>> {',
+     '/// MAE: the newest release from https://remote.maesuaisystem.com/version.json ({"build", "version", "release"}),\n/// verified against the signed metadata of that GitHub release. None when it is not newer than this build.\npub(super) fn mae_verified_update_artifact() -> ResultType<Option<VerifiedUpdateArtifact>> {\n    let latest: serde_json::Value = serde_json::from_slice(&fetch_update_sidecar_bytes(\n        "https://remote.maesuaisystem.com/version.json",\n    )?)?;\n    let build = latest["build"].as_u64().unwrap_or(0);\n    let version = latest["version"].as_str().unwrap_or_default();\n    let release = latest["release"].as_str().unwrap_or_default();\n    if build <= crate::common::MAE_BUILD || version.is_empty() || release.is_empty() {\n        return Ok(None);\n    }\n    if !release\n        .bytes()\n        .all(|b| b.is_ascii_alphanumeric() || matches!(b, b\'.\' | b\'-\' | b\'_\'))\n    {\n        bail!("Invalid MAE release id: {}", release);\n    }\n    let prefix = format!("https://github.com/maxspeedcom/mae-remote-desktop/releases/download/{release}/");\n    let metadata_url = format!("{prefix}mae-update.json");\n    let metadata_bytes = fetch_update_sidecar_bytes(&metadata_url)?;\n    let signature_bytes = fetch_update_sidecar_bytes(&format!("{metadata_url}.sig"))?;\n    let requirements = UpdateMetadataRequirements {\n        expected_version: version,\n        expected_release_id: release,\n        expected_artifact_url_prefix: prefix.as_str(),\n        artifact: current_update_artifact_query(false),\n    };\n    crate::update_metadata::verify_update_metadata(&metadata_bytes, &signature_bytes, requirements).map(Some)\n}\n\nfn fetch_update_sidecar_bytes(url: &str) -> ResultType<Vec<u8>> {'),
+]
+
 # ลิงก์ที่มีหลายจุดในไฟล์เดียว: แทนทุกจุด (ต้องเจออย่างน้อย 1)
 EDITS_ALL = [
     ('libs/portable/src/main.rs', 'RuntimeBroker_rustdesk.exe', 'RuntimeBroker_maeremote.exe'),
@@ -639,7 +673,7 @@ def write_icons(root):
 def main():
     root = pathlib.Path(sys.argv[1]).resolve()
     print('text edits:')
-    for rel, old, new in EDITS + TRAFFIC_EDITS + FIT_EDITS + INSTALL_EDITS + NAME_EDITS + OSS_EDITS + WORKFLOW_EDITS:
+    for rel, old, new in EDITS + TRAFFIC_EDITS + FIT_EDITS + INSTALL_EDITS + NAME_EDITS + OSS_EDITS + WORKFLOW_EDITS + AUTOUPDATE_EDITS:
         edit(root, rel, old, new)
     for rel, old, new in EDITS_ALL:
         edit(root, rel, old, new, all_=True)

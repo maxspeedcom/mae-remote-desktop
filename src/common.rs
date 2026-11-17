@@ -1176,7 +1176,7 @@ fn process_software_update_check_response(bytes: Bytes) -> ResultType<()> {
 
 // MAE Remote update notice. Bump MAE_BUILD for every release and keep
 // https://remote.maesuaisystem.com/version.json ({"build": N, "version": "<upstream version>-N"}) in step.
-pub const MAE_BUILD: u64 = 10;
+pub const MAE_BUILD: u64 = 11;
 const MAE_VERSION_URL: &str = "https://remote.maesuaisystem.com/version.json";
 
 fn mae_check_update() {

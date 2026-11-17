@@ -121,6 +121,37 @@ pub(super) fn verified_update_artifact_from_release_page_url(
     crate::update_metadata::verify_update_metadata(&metadata_bytes, &signature_bytes, requirements)
 }
 
+/// MAE: the newest release from https://remote.maesuaisystem.com/version.json ({"build", "version", "release"}),
+/// verified against the signed metadata of that GitHub release. None when it is not newer than this build.
+pub(super) fn mae_verified_update_artifact() -> ResultType<Option<VerifiedUpdateArtifact>> {
+    let latest: serde_json::Value = serde_json::from_slice(&fetch_update_sidecar_bytes(
+        "https://remote.maesuaisystem.com/version.json",
+    )?)?;
+    let build = latest["build"].as_u64().unwrap_or(0);
+    let version = latest["version"].as_str().unwrap_or_default();
+    let release = latest["release"].as_str().unwrap_or_default();
+    if build <= crate::common::MAE_BUILD || version.is_empty() || release.is_empty() {
+        return Ok(None);
+    }
+    if !release
+        .bytes()
+        .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-' | b'_'))
+    {
+        bail!("Invalid MAE release id: {}", release);
+    }
+    let prefix = format!("https://github.com/maxspeedcom/mae-remote-desktop/releases/download/{release}/");
+    let metadata_url = format!("{prefix}mae-update.json");
+    let metadata_bytes = fetch_update_sidecar_bytes(&metadata_url)?;
+    let signature_bytes = fetch_update_sidecar_bytes(&format!("{metadata_url}.sig"))?;
+    let requirements = UpdateMetadataRequirements {
+        expected_version: version,
+        expected_release_id: release,
+        expected_artifact_url_prefix: prefix.as_str(),
+        artifact: current_update_artifact_query(false),
+    };
+    crate::update_metadata::verify_update_metadata(&metadata_bytes, &signature_bytes, requirements).map(Some)
+}
+
 fn fetch_update_sidecar_bytes(url: &str) -> ResultType<Vec<u8>> {
     let client = create_http_client_with_url_strict(url)?;
     let mut response = client
@@ -177,8 +208,8 @@ pub fn get_update_download_file_from_url(url: &str) -> Option<PathBuf> {
     let tag = segments.next()?;
     let filename = segments.next()?;
 
-    if owner != "rustdesk"
-        || repo != "rustdesk"
+    if owner != "maxspeedcom"
+        || repo != "mae-remote-desktop"
         || releases != "releases"
         || download != "download"
         || tag.is_empty()

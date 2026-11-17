@@ -31,6 +31,8 @@ self-extracting installer `MAERemote-<version>-x86_64.exe`.
 - [`update-upstream.sh`](update-upstream.sh) builds the whole tree for an upstream tag (`./update-upstream.sh 1.5.3`,
   run from the folder that holds this repository as `rustdesk/`): upstream source + vendored `libs/hbb_common` + the
   two scripts below. Run with the tag the branch is built on, it reproduces the branch exactly.
+- [`sign-update.py`](sign-update.py) writes and verifies the signed update metadata (`mae-update.json` + `.sig`) that
+  installed copies use for automatic updates; the signing key is kept off the web server.
 - [`gen-workflow.py`](gen-workflow.py) generates `mae-windows.yml` from the upstream Flutter build workflow
   (Windows x64 only, no closed-source driver in the package).
 

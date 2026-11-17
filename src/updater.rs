@@ -188,7 +188,15 @@ fn start_auto_update_check_(rx_msg: Receiver<UpdateMsg>) {
 
 fn check_update(manually: bool) -> ResultType<()> {
     if crate::is_custom_client() {
-        return Ok(());
+        // MAE: own update channel (signed metadata on the MAE GitHub releases), see mae_check_update
+        #[cfg(target_os = "windows")]
+        {
+            return mae_check_update(manually);
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            return Ok(());
+        }
     }
     // On macOS, auto-update is handled by check_update_as_root() in the service process.
     // The shared check_update() path is only used for manual update checks from the GUI.
@@ -247,6 +255,28 @@ fn check_update(manually: bool) -> ResultType<()> {
                 )?;
             }
         }
+    }
+    Ok(())
+}
+
+/// MAE: install the release named in https://remote.maesuaisystem.com/version.json when its build is newer than
+/// MAE_BUILD. The installer and its metadata come from that release on GitHub, and the metadata must carry a valid
+/// signature by the MAE update key, so the website alone cannot make a client install anything.
+#[cfg(target_os = "windows")]
+fn mae_check_update(manually: bool) -> ResultType<()> {
+    if !(manually || config::Config::get_bool_option(keys::OPTION_ALLOW_AUTO_UPDATE)) {
+        return Ok(());
+    }
+    let Some(artifact) = artifact::mae_verified_update_artifact()? else {
+        log::debug!("No update available.");
+        return Ok(());
+    };
+    let Some(file_path) = get_update_download_file_from_url(&artifact.url) else {
+        bail!("Failed to get the file path from the URL: {}", artifact.url);
+    };
+    ensure_verified_update_artifact(&artifact.url, &file_path, artifact.size, &artifact.sha256)?;
+    if has_no_active_conns() {
+        update_new_version(false, &artifact.version, &file_path, &artifact.sha256);
     }
     Ok(())
 }
@@ -314,7 +344,8 @@ fn update_new_version(update_msi: bool, version: &str, file_path: &PathBuf, expe
                 else {
                     return;
                 };
-                let custom_client_staging_dir = if crate::is_custom_client() {
+                // MAE: no custom.txt to carry over, so no staging folder (it would be named after upstream)
+                let custom_client_staging_dir = if false && crate::is_custom_client() {
                     let custom_client_staging_dir =
                         crate::platform::get_custom_client_staging_dir();
                     if let Err(e) = crate::platform::handle_custom_client_staging_dir_before_update(

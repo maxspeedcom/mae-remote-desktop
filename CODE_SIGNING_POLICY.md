@@ -33,7 +33,10 @@ The program connects only to the servers it needs to work, and sends this to the
 - **Account service `remote.maesuaisystem.com`:** a heartbeat and system information (device ID, computer name, operating system,
   program version), connection records (who connected to whom, when, from which IP address) and the byte count of each session.
   Signing in is optional; an account adds the e-mail address and the saved address book.
-- **Update check:** `https://remote.maesuaisystem.com/version.json` at start-up.
+- **Updates (build 11 and later):** `https://remote.maesuaisystem.com/version.json` is checked at start-up and once a
+  day. A newer release is downloaded from this repository's GitHub releases together with `mae-update.json` and its
+  signature; the client installs it only if the signature verifies with the MAE update key built into it and the
+  installer's SHA-256 and size match, and only while no session is active. Settings > General > Auto update turns it off.
 
 Nothing else is sent to other networked systems unless the user asks for it (for example, connecting to a computer or opening a link).
 Full details: [privacy policy](https://remote.maesuaisystem.com/privacy.html).
